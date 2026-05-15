@@ -49,6 +49,11 @@
             <h3>Результати пошуку</h3>
             <div id="candidates-list">Тут з'являться результати...</div>
         </div>
+        <div class="card">
+            <h3>Відкриті вакансії</h3>
+            <button onclick="loadVacancies()" style="background: var(--recruiter); margin-bottom: 10px;">Оновити список вакансій</button>
+            <div id="vacancies-list">Натисніть кнопку, щоб завантажити вакансії...</div>
+        </div>
     </div>
 
     <script>
@@ -137,6 +142,56 @@
 
         function logout() {
             location.reload();
+        }
+        async function loadVacancies() {
+            const list = document.getElementById('vacancies-list');
+            list.innerHTML = "Завантаження...";
+
+            try {
+                const response = await fetch(`${API_URL}/vacancies`);
+                const vacancies = await response.json();
+
+                list.innerHTML = vacancies.length ? "" : "Вакансій поки немає.";
+                
+                vacancies.forEach(v => {
+                    const isAdmin = currentUser.role === 'admin';
+                    const div = document.createElement('div');
+                    div.className = 'candidate-item'; // Використовуємо ті ж стилі
+                    div.innerHTML = `
+                        <div>
+                            <strong>${v.title}</strong><br>
+                            <small>${v.description}</small><br>
+                            Статус: <span class="status-tag">${v.status}</span>
+                        </div>
+                        <div class="${isAdmin ? '' : 'hidden'}">
+                            <select onchange="updateVacancyStatus('${v._id}', this.value)">
+                                <option value="">Змінити статус</option>
+                                <option value="open">Open</option>
+                                <option value="closed">Closed</option>
+                                <option value="on hold">On Hold</option>
+                            </select>
+                        </div>
+                    `;
+                    list.appendChild(div);
+                });
+            } catch (err) {
+                list.innerHTML = "Помилка завантаження вакансій.";
+            }
+        }
+
+        async function updateVacancyStatus(id, newStatus) {
+            if (!newStatus) return;
+            
+            const response = await fetch(`${API_URL}/vacancies/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+
+            if (response.ok) {
+                alert("Статус вакансії оновлено!");
+                loadVacancies();
+            }
         }
     </script>
 </body>
