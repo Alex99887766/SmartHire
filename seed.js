@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const dbURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/SmartHire_DB';
+const dbURI = process.env.MONGODB_URI;
 
 const Candidate = mongoose.model('Candidate', {
     name: String, email: String, skills: [String], status: String

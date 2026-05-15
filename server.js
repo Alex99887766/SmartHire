@@ -1,6 +1,8 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const app = express();
+const cors = require('cors');
+app.use(cors());
 
 // Використовуємо порт, який надає хостинг (Render), або 5000 для локальної розробки [cite: 1618]
 const PORT = process.env.PORT || 5000;
