@@ -107,3 +107,5 @@ app.patch('/api/vacancies/:id', async (req, res) => {
 app.listen(PORT, () => {
     console.log(`Сервер SmartHire працює на http://localhost:${PORT}`);
 });
+
+module.exports = app;
