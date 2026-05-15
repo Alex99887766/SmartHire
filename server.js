@@ -36,32 +36,44 @@ const Vacancy = mongoose.model('Vacancy', {
 
 // --- ЕНДПОІНТИ API ---
 
-// 1. АВТОРИЗАЦІЯ (Спрощена логіка для демонстрації) [cite: 1426-1438, 1654-1658]
-app.post('/api/auth/login', (req, res) => {
-    const { email, password } = req.body;
-    
-    // В реальних системах тут проводиться пошук у БД та перевірка хешу пароля [cite: 539, 1432]
-    if (email === "admin@test.com" && password === "12345") {
-        res.status(200).json({ 
-            message: "Вхід виконано успішно", 
-            token: "fake-jwt-token",
-            user: { email: email, role: "admin" } 
+// 1. УНІВЕРСАЛЬНИЙ ПОШУК (за навичкою, ім'ям або статусом) [cite: 93, 1127]
+app.get('/api/candidates/search', async (req, res) => {
+    const { query } = req.query; // Отримуємо загальний рядок пошуку
+    try {
+        const results = await Candidate.find({
+            $or: [
+                { name: { $regex: query, $options: 'i' } },
+                { skills: { $in: [new RegExp(query, 'i')] } },
+                { status: { $regex: query, $options: 'i' } }
+            ]
         });
-    } else {
-        res.status(401).json({ message: "Невірний email або пароль" }); // 401 Unauthorized [cite: 1330]
+        res.json(results);
+    } catch (error) {
+        res.status(500).json({ message: "Помилка пошуку" });
     }
 });
 
-// 2. ПОШУК КАНДИДАТІВ ЗА НАВИЧКАМИ (Метод GET) [cite: 681-685, 1460, 1718]
-// Виклик: /api/candidates/search?skill=Node.js
-app.get('/api/candidates/search', async (req, res) => {
-    const { skill } = req.query;
+// 2. РЕДАГУВАННЯ ДАНИХ КАНДИДАТА (PATCH) [cite: 721, 1289]
+app.patch('/api/candidates/:id', async (req, res) => {
     try {
-        // Пошук документів, де в масиві skills є вказана навичка [cite: 685]
-        const results = await Candidate.find({ skills: skill });
-        res.json(results);
+        const updated = await Candidate.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        res.json(updated);
     } catch (error) {
-        res.status(500).json({ message: "Помилка сервера при пошуку" });
+        res.status(400).json({ message: "Не вдалося оновити дані" });
+    }
+});
+
+// 3. РІВНІ ДОСТУПУ (RBAC) [cite: 832, 845, 1088]
+app.post('/api/auth/login', (req, res) => {
+    const { email, password } = req.body;
+    
+    // Імітація бази користувачів з ролями
+    if (email === "admin@test.com" && password === "12345") {
+        res.json({ role: "admin", token: "secret-admin-token" });
+    } else if (email === "recruiter@test.com" && password === "12345") {
+        res.json({ role: "recruiter", token: "secret-recruiter-token" });
+    } else {
+        res.status(401).json({ message: "Доступ заборонено" });
     }
 });
 

@@ -2,81 +2,141 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>SmartHire ATS - Frontend</title>
+    <title>SmartHire ATS - Pro Dashboard</title>
     <style>
-        body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.6; background: #f4f7f6; }
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        input { padding: 8px; margin: 5px 0; width: 100%; box-sizing: border-box; }
-        button { padding: 10px 15px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        button:hover { background: #218838; }
-        pre { background: #eee; padding: 10px; overflow-x: auto; border-radius: 4px; }
+        :root { --primary: #2c3e50; --success: #27ae60; --admin: #e74c3c; --recruiter: #3498db; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 900px; margin: 40px auto; padding: 20px; background: #ecf0f1; color: var(--primary); }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 25px; }
+        input, select { padding: 12px; margin: 10px 0; width: 100%; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        button { padding: 12px 20px; background: var(--success); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+        .candidate-item { border-left: 5px solid #ddd; padding: 15px; margin: 10px 0; background: #f9f9f9; display: flex; justify-content: space-between; align-items: center; border-radius: 4px; }
+        .role-badge { padding: 4px 8px; border-radius: 4px; font-size: 0.8em; color: white; margin-bottom: 10px; display: inline-block; }
+        .admin-only { border-color: var(--admin); display: none; } /* Приховано за замовчуванням */
+        .status-tag { font-weight: bold; color: var(--success); }
         .hidden { display: none; }
     </style>
 </head>
 <body>
 
-    <h1>SmartHire: Система управління наймом</h1>
-
     <div id="auth-section" class="card">
-        <h3>Авторизація</h3>
-        <input type="email" id="email" placeholder="Email (admin@test.com)" value="admin@test.com">
-        <input type="password" id="password" placeholder="Пароль (12345)" value="12345">
+        <h2>Вхід у систему</h2>
+        <input type="email" id="email" placeholder="Email (admin@test.com або recruiter@test.com)">
+        <input type="password" id="password" placeholder="Пароль">
         <button onclick="login()">Увійти</button>
-        <p id="auth-status"></p>
+        <p id="auth-error" style="color: red;"></p>
     </div>
 
-    <div id="main-section" class="card hidden">
-        <h3>Пошук кандидатів</h3>
-        <input type="text" id="skill-input" placeholder="Введіть навичку (напр. Node.js)">
-        <button onclick="searchCandidates()">Знайти</button>
-        <div id="results"></div>
+    <div id="dashboard" class="hidden">
+        <div class="card" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <span id="user-role-display" class="role-badge"></span>
+                <h2 id="welcome-msg">Панель управління</h2>
+            </div>
+            <button onclick="logout()" style="background: #95a5a6;">Вийти</button>
+        </div>
+
+        <div class="card">
+            <h3>Універсальний пошук</h3>
+            <p><small>Шукайте за ім'ям, навичкою або статусом (напр. "Node.js", "Олексій" або "Offer")</small></p>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="search-query" placeholder="Введіть запит...">
+                <button onclick="search()">Пошук</button>
+            </div>
+        </div>
+
+        <div id="results" class="card">
+            <h3>Результати пошуку</h3>
+            <div id="candidates-list">Тут з'являться результати...</div>
+        </div>
     </div>
 
     <script>
-        // ЗАМІНИ ЦЮ АДРЕСУ НА СВОЮ ВІД RENDER
         const API_URL = "https://smarthire-5w6w.onrender.com/api";
+        let currentUser = { role: null, token: null };
 
         async function login() {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
 
-            try {
-                const response = await fetch(`${API_URL}/auth/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
-                });
+            const response = await fetch(`${API_URL}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
 
+            if (response.ok) {
                 const data = await response.json();
-                if (response.ok) {
-                    document.getElementById('auth-status').innerText = "Вхід успішний!";
-                    document.getElementById('auth-section').classList.add('hidden');
-                    document.getElementById('main-section').classList.remove('hidden');
-                } else {
-                    document.getElementById('auth-status').innerText = "Помилка: " + data.message;
-                }
-            } catch (err) {
-                document.getElementById('auth-status').innerText = "Сервер не відповідає";
+                currentUser = data;
+                showDashboard();
+            } else {
+                document.getElementById('auth-error').innerText = "Помилка доступу. Перевірте дані.";
             }
         }
 
-        async function searchCandidates() {
-            const skill = document.getElementById('skill-input').value;
-            const resultsDiv = document.getElementById('results');
-            resultsDiv.innerHTML = "Завантаження...";
+        function showDashboard() {
+            document.getElementById('auth-section').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+            
+            const badge = document.getElementById('user-role-display');
+            badge.innerText = currentUser.role.toUpperCase();
+            badge.style.backgroundColor = currentUser.role === 'admin' ? 'var(--admin)' : 'var(--recruiter)';
+            
+            // Якщо адмін — дозволяємо бачити елементи редагування в майбутньому списку
+            search(); 
+        }
 
-            try {
-                const response = await fetch(`${API_URL}/candidates/search?skill=${skill}`);
-                const data = await response.json();
-                
-                if (data.length > 0) {
-                    resultsDiv.innerHTML = `<h4>Знайдено: ${data.length}</h4><pre>${JSON.stringify(data, null, 2)}</pre>`;
-                } else {
-                    resultsDiv.innerHTML = "Нікого не знайдено за цією навичкою.";
-                }
-            } catch (err) {
-                resultsDiv.innerHTML = "Помилка при пошуку.";
+        async function search() {
+            const query = document.getElementById('search-query').value;
+            const list = document.getElementById('candidates-list');
+            list.innerHTML = "Завантаження...";
+
+            const response = await fetch(`${API_URL}/candidates/search?query=${query}`);
+            const candidates = await response.json();
+
+            list.innerHTML = candidates.length ? "" : "Нікого не знайдено.";
+            
+            candidates.forEach(c => {
+                const isAdmin = currentUser.role === 'admin';
+                const div = document.createElement('div');
+                div.className = 'candidate-item';
+                div.innerHTML = `
+                    <div>
+                        <strong>${c.name}</strong> (${c.email})<br>
+                        <small>Навички: ${c.skills.join(', ')}</small><br>
+                        Статус: <span class="status-tag">${c.status}</span>
+                    </div>
+                    <div class="${isAdmin ? '' : 'hidden'}">
+                        <select onchange="updateCandidateStatus('${c._id}', this.value)">
+                            <option value="">Змінити статус</option>
+                            <option value="New">New</option>
+                            <option value="Interview">Interview</option>
+                            <option value="Offer">Offer</option>
+                            <option value="Rejected">Rejected</option>
+                        </select>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        async function updateCandidateStatus(id, newStatus) {
+            if (!newStatus) return;
+            
+            const response = await fetch(`${API_URL}/candidates/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+
+            if (response.ok) {
+                alert("Статус оновлено!");
+                search(); // Оновлюємо список
             }
+        }
+
+        function logout() {
+            location.reload();
         }
     </script>
 </body>
