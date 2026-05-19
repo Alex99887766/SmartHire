@@ -55,8 +55,9 @@
             <div id="vacancies-list">Натисніть кнопку, щоб завантажити вакансії...</div>
         </div>
         <div id="admin-panel" class="card">
-        <h3>Керування користувачами системи (Доступно: ADMIN)</h3>
-            <div style="display: flex; gap: 10px;">
+            <h3>Керування користувачами системи (Доступно: ADMIN)</h3>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
                 <input type="email" id="new-user-email" placeholder="Новий користувач email">
                 <input type="text" id="new-user-pass" placeholder="Пароль">
                 <select id="new-user-role" style="width: 200px;">
@@ -65,6 +66,9 @@
                 </select>
                 <button onclick="createUser()">Додати</button>
             </div>
+
+            <h4>Поточні користувачі:</h4>
+            <div id="users-list">Завантаження користувачів...</div>
         </div>
     </div>
 
@@ -113,6 +117,7 @@
                     // Очищаємо поля після створення
                     document.getElementById('new-user-email').value = '';
                     document.getElementById('new-user-pass').value = '';
+                    loadUsers();
                 } else {
                     const errData = await response.json();
                     alert(`Помилка: ${errData.message || "Не вдалося створити користувача"}`);
@@ -123,6 +128,59 @@
             }
         }
 
+        // Функція для завантаження та відображення користувачів
+        async function loadUsers() {
+            // Показуємо список тільки якщо зайшов адмін
+            if (currentUser.role !== 'admin') return;
+
+            const list = document.getElementById('users-list');
+            try {
+                const response = await fetch(`${API_URL}/users`);
+                const users = await response.json();
+
+                list.innerHTML = users.length ? "" : "Користувачів немає.";
+
+                users.forEach(u => {
+                    const div = document.createElement('div');
+                    // Щоб не видалити самого себе випадково, ховаємо кнопку видалення для поточного адміна
+                    const isSelf = u.email === document.getElementById('email').value;
+                    
+                    div.style = "display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee;";
+                    div.innerHTML = `
+                        <div>
+                            <strong>${u.email}</strong> — <span style="color: #16a085;">${u.role}</span>
+                        </div>
+                        <div>
+                            ${isSelf ? '<small style="color:gray;">(Це ви)</small>' : `<button onclick="deleteUser('${u._id}')" style="background:#e74c3c; padding: 5px 10px; font-size: 0.8em;">Видалити</button>`}
+                        </div>
+                    `;
+                    list.appendChild(div);
+                });
+            } catch (error) {
+                list.innerHTML = "Не вдалося завантажити користувачів.";
+            }
+        }
+
+        // Функція для видалення користувача
+        async function deleteUser(id) {
+            if (!confirm("Ви впевнені, що хочете видалити цього користувача?")) return;
+
+            try {
+                const response = await fetch(`${API_URL}/users/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    alert("Користувача видалено!");
+                    loadUsers(); // Перезавантажуємо список користувачів
+                } else {
+                    alert("Помилка видалення.");
+                }
+            } catch (error) {
+                console.error(error);
+                alert("Помилка відправки запиту.");
+            }
+}
         async function linkVacancy(candidateId, vacancyId) {
             if (!vacancyId) return;
             const response = await fetch(`${API_URL}/candidates/${candidateId}`, {
@@ -146,6 +204,8 @@
             
             // Якщо адмін — дозволяємо бачити елементи редагування в майбутньому списку
             search(); 
+            loadVacancies();
+            loadUsers(); //
         }
 
         async function search() {
