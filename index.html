@@ -54,6 +54,18 @@
             <button onclick="loadVacancies()" style="background: var(--recruiter); margin-bottom: 10px;">Оновити список вакансій</button>
             <div id="vacancies-list">Натисніть кнопку, щоб завантажити вакансії...</div>
         </div>
+        <div id="admin-panel" class="card">
+        <h3>Керування користувачами системи (Доступно: ADMIN)</h3>
+            <div style="display: flex; gap: 10px;">
+                <input type="email" id="new-user-email" placeholder="Новий користувач email">
+                <input type="text" id="new-user-pass" placeholder="Пароль">
+                <select id="new-user-role" style="width: 200px;">
+                    <option value="recruiter">Recruiter</option>
+                    <option value="admin">Admin</option>
+                </select>
+                <button onclick="createUser()">Додати</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -76,6 +88,19 @@
                 showDashboard();
             } else {
                 document.getElementById('auth-error').innerText = "Помилка доступу. Перевірте дані.";
+            }
+        }
+        
+        async function linkVacancy(candidateId, vacancyId) {
+            if (!vacancyId) return;
+            const response = await fetch(`${API_URL}/candidates/${candidateId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ vacancyId: vacancyId })
+            });
+            if (response.ok) {
+                alert("Кандидата успішно з'єднано з вакансією!");
+                search();
             }
         }
 
@@ -102,16 +127,18 @@
             list.innerHTML = candidates.length ? "" : "Нікого не знайдено.";
             
             candidates.forEach(c => {
-                const isAdmin = currentUser.role === 'admin';
+                const hasEditAccess = currentUser.role === 'admin' || currentUser.role === 'recruiter';
                 const div = document.createElement('div');
                 div.className = 'candidate-item';
+                const vacancyText = c.vacancyId ? `<br><span style="color:#d35400">🔗 Прив'язано до вакансії ID: ${c.vacancyId}</span>` : '';
+
                 div.innerHTML = `
                     <div>
-                        <strong>${c.name}</strong> (${c.email})<br>
+                        <strong>${c.name}</strong> (${c.email})${vacancyText}<br>
                         <small>Навички: ${c.skills.join(', ')}</small><br>
                         Статус: <span class="status-tag">${c.status}</span>
                     </div>
-                    <div class="${isAdmin ? '' : 'hidden'}">
+                    <div class="${hasEditAccess ? '' : 'hidden'}">
                         <select onchange="updateCandidateStatus('${c._id}', this.value)">
                             <option value="">Змінити статус</option>
                             <option value="New">New</option>
@@ -119,6 +146,10 @@
                             <option value="Offer">Offer</option>
                             <option value="Rejected">Rejected</option>
                         </select>
+                        
+                        <input type="text" placeholder="ID вакансії для прив'язки" 
+                            style="width: 180px; padding: 5px; margin-top: 5px;"
+                            onchange="linkVacancy('${c._id}', this.value)">
                     </div>
                 `;
                 list.appendChild(div);

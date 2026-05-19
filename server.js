@@ -4,41 +4,46 @@ const app = express();
 const cors = require('cors');
 app.use(cors());
 
-// Використовуємо порт, який надає хостинг (Render), або 5000 для локальної розробки [cite: 1618]
 const PORT = process.env.PORT || 5000;
 
-// Middleware для розпізнавання JSON у запитах [cite: 1621-1623]
+// Middleware для розпізнавання JSON у запитах
 app.use(express.json());
 
 // --- ПІДКЛЮЧЕННЯ ДО БАЗИ ДАНИХ ---
-// Рядок підключення: береться з налаштувань Render (Atlas) або використовується локальний [cite: 657-658, 731]
+// Рядок підключення: береться з налаштувань Render (Atlas)
 const dbURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/SmartHire_DB';
 
 mongoose.connect(dbURI)
     .then(() => console.log('Успішно підключено до MongoDB'))
     .catch(err => console.error('Помилка підключення до бази даних:', err));
 
-// --- МОДЕЛІ ДАНИХ (СХЕМИ) ---
-// Модель для кандидатів [cite: 732, 767]
+// --- МОДЕЛІ ДАНИХ ---
 const Candidate = mongoose.model('Candidate', {
     name: { type: String, required: true },
     email: { type: String, required: true },
     skills: [String],
-    status: { type: String, default: 'New' }
+    status: { type: String, default: 'New' },
+    location: String,
+    vacancyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vacancy', default: null } // Зв'язок з вакансією
 });
 
-// Модель для вакансій [cite: 732, 767]
 const Vacancy = mongoose.model('Vacancy', {
     title: { type: String, required: true },
     description: String,
     status: { type: String, default: 'open' }
 });
 
+const User = mongoose.model('User', {
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    role: { type: String, required: true, enum: ['admin', 'recruiter'] }
+});
+
 // --- ЕНДПОІНТИ API ---
 
-// 1. УНІВЕРСАЛЬНИЙ ПОШУК (за навичкою, ім'ям або статусом) [cite: 93, 1127]
+// 1. УНІВЕРСАЛЬНИЙ ПОШУК
 app.get('/api/candidates/search', async (req, res) => {
-    const { query } = req.query; // Отримуємо загальний рядок пошуку
+    const { query } = req.query;
     try {
         const results = await Candidate.find({
             $or: [
@@ -53,7 +58,7 @@ app.get('/api/candidates/search', async (req, res) => {
     }
 });
 
-// 2. РЕДАГУВАННЯ ДАНИХ КАНДИДАТА (PATCH) [cite: 721, 1289]
+// 2. РЕДАГУВАННЯ ДАНИХ КАНДИДАТА
 app.patch('/api/candidates/:id', async (req, res) => {
     try {
         const updated = await Candidate.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -63,21 +68,50 @@ app.patch('/api/candidates/:id', async (req, res) => {
     }
 });
 
-// 3. РІВНІ ДОСТУПУ (RBAC) [cite: 832, 845, 1088]
-app.post('/api/auth/login', (req, res) => {
+// 3. РІВНІ ДОСТУПУ
+app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
-    
-    // Імітація бази користувачів з ролями
-    if (email === "admin@test.com" && password === "12345") {
-        res.json({ role: "admin", token: "secret-admin-token" });
-    } else if (email === "recruiter@test.com" && password === "12345") {
-        res.json({ role: "recruiter", token: "secret-recruiter-token" });
-    } else {
-        res.status(401).json({ message: "Доступ заборонено" });
+    try {
+        const user = await User.findOne({ email, password });
+        if (!user) {
+            return res.status(401).json({ message: "Невірний email або пароль" });
+        }
+        res.json({ role: user.role, token: `secret-${user.role}-token` });
+    } catch (error) {
+        res.status(500).json({ message: "Помилка авторизації" });
     }
 });
 
-// 3. ОТРИМАТИ СПИСОК ВСІХ ВАКАНСІЙ [cite: 1460, 1719]
+// Керування користувачами
+app.get('/api/users', async (req, res) => {
+    try {
+        const users = await User.find();
+        res.json(users);
+    } catch (error) {
+        res.status(500).json({ message: "Помилка отримання користувачів" });
+    }
+});
+
+app.post('/api/users', async (req, res) => {
+    try {
+        const newUser = new User(req.body);
+        await newUser.save();
+        res.status(201).json(newUser);
+    } catch (error) {
+        res.status(400).json({ message: "Не вдалося створити користувача" });
+    }
+});
+
+app.delete('/api/users/:id', async (req, res) => {
+    try {
+        await User.findByIdAndDelete(req.params.id);
+        res.json({ message: "Користувача видалено" });
+    } catch (error) {
+        res.status(400).json({ message: "Помилка видалення" });
+    }
+});
+
+// 3. ОТРИМАТИ СПИСОК ВСІХ ВАКАНСІЙ
 app.get('/api/vacancies', async (req, res) => {
     try {
         const vacancies = await Vacancy.find();
@@ -87,19 +121,28 @@ app.get('/api/vacancies', async (req, res) => {
     }
 });
 
-// 4. ЗМІНА СТАТУСУ ВАКАНСІЇ (Метод PATCH) [cite: 691-692, 1320, 1581-1582]
+// 4. ЗМІНА СТАТУСУ ВАКАНСІЇ
 app.patch('/api/vacancies/:id', async (req, res) => {
     const { status } = req.body;
     try {
         const updatedVacancy = await Vacancy.findByIdAndUpdate(
             req.params.id, 
             { status: status }, 
-            { new: true } // Повертає вже оновлений документ
+            { new: true }
         );
         if (!updatedVacancy) return res.status(404).json({ message: "Вакансію не знайдено" });
         res.json(updatedVacancy);
     } catch (error) {
         res.status(400).json({ message: "Некоректний ID або дані" });
+    }
+});
+
+app.patch('/api/candidates/:id', async (req, res) => {
+    try {
+        const updated = await Candidate.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        res.json(updated);
+    } catch (error) {
+        res.status(400).json({ message: "Не вдалося оновити дані кандидата" });
     }
 });
 
