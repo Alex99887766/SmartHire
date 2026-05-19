@@ -114,8 +114,18 @@ app.delete('/api/users/:id', async (req, res) => {
 // 3. ОТРИМАТИ СПИСОК ВСІХ ВАКАНСІЙ
 app.get('/api/vacancies', async (req, res) => {
     try {
-        const vacancies = await Vacancy.find();
-        res.json(vacancies);
+        const vacancies = await Vacancy.find().lean(); // .lean() дозволяє модифікувати об'єкти Mongoose
+
+        // Для кожної вакансії шукаємо кандидатів, які до неї прив'язані
+        const vacanciesWithCandidates = await Promise.all(vacancies.map(async (vacancy) => {
+            const candidates = await Candidate.find({ vacancyId: vacancy._id }, 'name email status');
+            return {
+                ...vacancy,
+                linkedCandidates: candidates // Додаємо масив кандидатів прямо у об'єкт вакансії
+            };
+        }));
+
+        res.json(vacanciesWithCandidates);
     } catch (error) {
         res.status(500).json({ message: "Не вдалося отримати вакансії" });
     }

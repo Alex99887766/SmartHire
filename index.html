@@ -91,6 +91,38 @@
             }
         }
         
+        async function createUser() {
+            const email = document.getElementById('new-user-email').value;
+            const password = document.getElementById('new-user-pass').value;
+            const role = document.getElementById('new-user-role').value;
+
+            if (!email || !password) {
+                alert("Будь ласка, заповніть email та пароль!");
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password, role })
+                });
+
+                if (response.ok) {
+                    alert(`Користувача ${email} успішно створено в базі даних!`);
+                    // Очищаємо поля після створення
+                    document.getElementById('new-user-email').value = '';
+                    document.getElementById('new-user-pass').value = '';
+                } else {
+                    const errData = await response.json();
+                    alert(`Помилка: ${errData.message || "Не вдалося створити користувача"}`);
+                }
+            } catch (error) {
+                console.error(error);
+                alert("Помилка відправки запиту на сервер.");
+            }
+        }
+
         async function linkVacancy(candidateId, vacancyId) {
             if (!vacancyId) return;
             const response = await fetch(`${API_URL}/candidates/${candidateId}`, {
@@ -187,12 +219,28 @@
                 vacancies.forEach(v => {
                     const div = document.createElement('div');
                     div.className = 'candidate-item';
+                    
+                    // Формуємо список кандидатів, якщо вони прив'язані до цієї вакансії
+                    let candidatesHtml = '<span style="color: gray;">Немає прив’язаних кандидатів</span>';
+                    if (v.linkedCandidates && v.linkedCandidates.length > 0) {
+                        candidatesHtml = v.linkedCandidates.map(c => 
+                            `<div style="margin-left: 15px; font-size: 0.9em; color: #2980b9;">
+                                👤 <strong>${c.name}</strong> (${c.status})
+                            </div>`
+                        ).join('');
+                    }
+
                     div.innerHTML = `
                         <div>
                             <strong>${v.title}</strong><br>
                             <small>${v.description}</small><br>
                             Статус: <span class="status-tag">${v.status}</span>
-                            <br><small style="color: gray;">ID вакансії: ${v._id}</small> 
+                            <br><small style="color: gray;">ID вакансії: ${v._id}</small>
+                            
+                            <div style="margin-top: 10px; padding-top: 5px; border-top: 1px dashed #ddd;">
+                                <small><strong>Прив'язані кандидати:</strong></small>
+                                ${candidatesHtml}
+                            </div>
                         </div>
                         <div class="${hasEditAccess ? '' : 'hidden'}">
                             <select onchange="updateVacancyStatus('${v._id}', this.value)">
