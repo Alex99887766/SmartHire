@@ -54,7 +54,7 @@
             <button onclick="loadVacancies()" style="background: var(--recruiter); margin-bottom: 10px;">Оновити список вакансій</button>
             <div id="vacancies-list">Натисніть кнопку, щоб завантажити вакансії...</div>
         </div>
-        <div id="admin-panel" class="card">
+        <div id="admin-panel" class="card hidden">
             <h3>Керування користувачами системи (Доступно: ADMIN)</h3>
             
             <div style="display: flex; gap: 10px; margin-bottom: 20px;">
@@ -130,10 +130,9 @@
 
         // Функція для завантаження та відображення користувачів
         async function loadUsers() {
-            // Показуємо список тільки якщо зайшов адмін
-            if (currentUser.role !== 'admin') return;
-
             const list = document.getElementById('users-list');
+            list.innerHTML = "Завантаження..."; // Скидаємо текст перед запитом
+
             try {
                 const response = await fetch(`${API_URL}/users`);
                 const users = await response.json();
@@ -142,7 +141,6 @@
 
                 users.forEach(u => {
                     const div = document.createElement('div');
-                    // Щоб не видалити самого себе випадково, ховаємо кнопку видалення для поточного адміна
                     const isSelf = u.email === document.getElementById('email').value;
                     
                     div.style = "display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee;";
@@ -151,12 +149,13 @@
                             <strong>${u.email}</strong> — <span style="color: #16a085;">${u.role}</span>
                         </div>
                         <div>
-                            ${isSelf ? '<small style="color:gray;">(Це ви)</small>' : `<button onclick="deleteUser('${u._id}')" style="background:#e74c3c; padding: 5px 10px; font-size: 0.8em;">Видалити</button>`}
+                            ${isSelf ? '<small style="color:gray;">(Це ви)</small>' : `<button onclick="deleteUser('${u._id}')" style="background:#e74c3c; padding: 5px 10px; font-size: 0.8em; color:white; border:none; border-radius:4px; cursor:pointer;">Видалити</button>`}
                         </div>
                     `;
                     list.appendChild(div);
                 });
             } catch (error) {
+                console.error(error);
                 list.innerHTML = "Не вдалося завантажити користувачів.";
             }
         }
@@ -202,10 +201,16 @@
             badge.innerText = currentUser.role.toUpperCase();
             badge.style.backgroundColor = currentUser.role === 'admin' ? 'var(--admin)' : 'var(--recruiter)';
             
-            // Якщо адмін — дозволяємо бачити елементи редагування в майбутньому списку
+            const adminPanel = document.getElementById('admin-panel');
+            if (currentUser.role === 'admin') {
+                adminPanel.classList.remove('hidden'); // Показуємо панель тільки адміну
+                loadUsers(); // Завантажуємо список користувачів тільки для адміна
+            } else {
+                adminPanel.classList.add('hidden'); // Рекрутерам примусово ховаємо
+            }
+            
             search(); 
             loadVacancies();
-            loadUsers(); //
         }
 
         async function search() {
