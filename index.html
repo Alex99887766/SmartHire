@@ -185,26 +185,26 @@
                 list.innerHTML = vacancies.length ? "" : "Вакансій поки немає.";
                 
                 vacancies.forEach(v => {
-                                const div = document.createElement('div');
-                div.className = 'candidate-item';
-                div.innerHTML = `
-                    <div>
-                        <strong>${v.title}</strong><br>
-                        <small>${v.description}</small><br>
-                        Статус: <span class="status-tag">${v.status}</span>
-                        <br><small style="color: gray;">ID вакансії: ${v._id}</small> 
-                    </div>
-                    <div class="${hasEditAccess ? '' : 'hidden'}">
-                        <select onchange="updateVacancyStatus('${v._id}', this.value)">
-                            <option value="">Змінити статус</option>
-                            <option value="open">Open</option>
-                            <option value="closed">Closed</option>
-                            <option value="on hold">On Hold</option>
-                        </select>
-                    </div>
-                `;
-                list.appendChild(div);
-            });
+                    const div = document.createElement('div');
+                    div.className = 'candidate-item';
+                    div.innerHTML = `
+                        <div>
+                            <strong>${v.title}</strong><br>
+                            <small>${v.description}</small><br>
+                            Статус: <span class="status-tag">${v.status}</span>
+                            <br><small style="color: gray;">ID вакансії: ${v._id}</small> 
+                        </div>
+                        <div class="${hasEditAccess ? '' : 'hidden'}">
+                            <select onchange="updateVacancyStatus('${v._id}', this.value)">
+                                <option value="">Змінити статус</option>
+                                <option value="open">Open</option>
+                                <option value="closed">Closed</option>
+                                <option value="on hold">On Hold</option>
+                            </select>
+                        </div>
+                    `;
+                    list.appendChild(div);
+                });
             } catch (err) {
                 list.innerHTML = "Помилка завантаження вакансій.";
             }
