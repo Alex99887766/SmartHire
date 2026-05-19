@@ -181,7 +181,7 @@
             try {
                 const response = await fetch(`${API_URL}/vacancies`);
                 const vacancies = await response.json();
-
+                const hasEditAccess = currentUser.role === 'admin' || currentUser.role === 'recruiter';
                 list.innerHTML = vacancies.length ? "" : "Вакансій поки немає.";
                 
                 vacancies.forEach(v => {
